@@ -1,0 +1,17 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# secrets
+.env
+
+# model artifacts — adapters and merged weights are downloaded from the Colab run,
+# not committed. results/*.json (the numbers) IS committed; the weights are not.
+adapters/
+*.safetensors
+*.gguf
+
+# misc
+.DS_Store

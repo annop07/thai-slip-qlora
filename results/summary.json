@@ -1,0 +1,82 @@
+[
+  {
+    "config": "api-deepseek-v3.2",
+    "model": "deepseek-v3.2",
+    "missing_predictions": 0,
+    "overall": {
+      "n": 250,
+      "clean_json_rate": 0.24,
+      "parsed_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "field_accuracy": 0.9934545454545455,
+      "exact_record_rate": 0.956,
+      "per_field_accuracy": {
+        "doc_type": 1.0,
+        "amount": 1.0,
+        "fee": 1.0,
+        "date": 0.98,
+        "time": 1.0,
+        "sender_name": 0.988,
+        "sender_account": 0.992,
+        "receiver_name": 0.988,
+        "receiver_account": 0.988,
+        "channel": 0.992,
+        "reference": 1.0
+      },
+      "latency_ms_median": 4449.099916993873,
+      "latency_ms_p90": 8079.92429099977,
+      "prompt_tokens_mean": 432.176,
+      "completion_tokens_mean": 146.176
+    },
+    "seen_layouts": {
+      "n": 175,
+      "clean_json_rate": 0.2342857142857143,
+      "parsed_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "field_accuracy": 0.9927272727272727,
+      "exact_record_rate": 0.96,
+      "per_field_accuracy": {
+        "doc_type": 1.0,
+        "amount": 1.0,
+        "fee": 1.0,
+        "date": 0.9885714285714285,
+        "time": 1.0,
+        "sender_name": 0.9885714285714285,
+        "sender_account": 0.9885714285714285,
+        "receiver_name": 0.9828571428571429,
+        "receiver_account": 0.9828571428571429,
+        "channel": 0.9885714285714285,
+        "reference": 1.0
+      },
+      "latency_ms_median": 4546.070166979916,
+      "latency_ms_p90": 9069.395958998939,
+      "prompt_tokens_mean": 433.70285714285717,
+      "completion_tokens_mean": 158.96571428571428
+    },
+    "unseen_layouts": {
+      "n": 75,
+      "clean_json_rate": 0.25333333333333335,
+      "parsed_rate": 1.0,
+      "schema_valid_rate": 1.0,
+      "field_accuracy": 0.9951515151515151,
+      "exact_record_rate": 0.9466666666666667,
+      "per_field_accuracy": {
+        "doc_type": 1.0,
+        "amount": 1.0,
+        "fee": 1.0,
+        "date": 0.96,
+        "time": 1.0,
+        "sender_name": 0.9866666666666667,
+        "sender_account": 1.0,
+        "receiver_name": 1.0,
+        "receiver_account": 1.0,
+        "channel": 1.0,
+        "reference": 1.0
+      },
+      "latency_ms_median": 4147.275041992543,
+      "latency_ms_p90": 5867.232457996579,
+      "prompt_tokens_mean": 428.61333333333334,
+      "completion_tokens_mean": 116.33333333333333
+    }
+  }
+]

@@ -1,0 +1,25 @@
+[project]
+name = "slipft"
+version = "0.1.0"
+description = "QLoRA fine-tuning of a small LLM for Thai payment-slip extraction, with a benchmark against the base model and a frontier API model"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slipft"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
