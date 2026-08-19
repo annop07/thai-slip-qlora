@@ -16,12 +16,12 @@ in a fraction of the time, and the per-slip cost is zero.
 | --- | --- |
 | Corpus generator, 10 slip layouts, 2 held out of training | ✅ 1,200 / 150 / 250 rows, reproducible from a seed |
 | Schema, prompt, scorer, unit tests | ✅ 39 tests |
-| Frontier-model baseline over the KKU proxy | ✅ measured — `deepseek-v3.2`, 250/250 rows |
-| QLoRA training + base/tuned evaluation notebook | ✅ written, ▶︎ **not yet run** (Colab T4) |
-| Base vs tuned rows of the benchmark | ⬜ produced by that notebook run |
+| Frontier-model baseline over the KKU proxy | ✅ `deepseek-v3.2`, 250/250 rows |
+| QLoRA training run | ✅ 18.2 min on a free Colab T4, 4.1 GB peak |
+| Base vs tuned, measured on the same GPU in the same session | ✅ 250 slips each |
 
-Everything except the training run is measured, and the training run is one
-notebook away. The reason it is not in this repo yet is stated plainly below.
+**The 1.5B adapter matches the frontier model on this task** — and the held-out
+layouts say where it does not.
 
 ## Where the training runs, and why not here
 
@@ -80,40 +80,106 @@ lose their commas and their ฿; account masks keep theirs exactly.
 | Held-out layouts that separate "learned the task" from "memorised the format" | `ttb_transfer`, `grab_receipt` — test split only |
 | Tests that pin the labels rather than the code paths | [`tests/`](tests/) |
 
-## Results so far
+## Results
 
-`deepseek-v3.2` over the KKU proxy, 250 held-out slips, greedy, 2026-08-19:
+250 held-out slips, greedy decoding, one scorer. Base and tuned are the same
+weights before and after training, run on the same T4 in the same session.
 
-| Configuration | Field acc. | Exact record | Unseen layouts | Clean JSON | Median latency | Completion tokens |
-| --- | --- | --- | --- | --- | --- | --- |
-| `deepseek-v3.2` (API) | **0.993** | **0.96** | 0.995 | 0.24 | 4,449 ms | 146 |
-| Qwen2.5-1.5B base | — | — | — | — | — | — |
-| Qwen2.5-1.5B + QLoRA | — | — | — | — | — | — |
+| Configuration | Field acc. | Exact record | Clean JSON | Median latency | Completion tokens |
+| --- | --- | --- | --- | --- | --- |
+| Qwen2.5-1.5B base | 0.733 | 0.01 | 0.00 | 5,486 ms | 136 |
+| **Qwen2.5-1.5B + QLoRA** | **0.995** | **0.96** | **1.00** | 6,571 ms | 106 |
+| `deepseek-v3.2` over an API | 0.993 | 0.96 | 0.24 | 4,449 ms | 146 |
 
-Per field, the frontier model misses almost nothing: `date` 0.98 is its weakest
-column and everything else is 0.99 or 1.00. **That is the bar**, and it sets up
-the actual question — a 1.5B adapter does not have to be better, it has to be
-close enough that 4.4 seconds and a round trip to a server become the
-difference that matters.
+An 18-minute training run on a free GPU took a model that got **1 slip in 100**
+completely right to one that gets **96 in 100** — level with a frontier model
+that is hundreds of times its size, and ahead of it on output format.
 
-Two things the API row already showed:
+Per field, where the 1.5B was losing:
 
-**`clean_json_rate` of 0.24 is a formatting habit, not a failure.** Three
-quarters of the replies arrive wrapped in a ```json fence despite the prompt
-saying not to. The scorer digs the object out, so accuracy is unaffected — but
-a service would have to strip fences forever. This is the column a fine-tune
-should take to 1.00, because the format is trained rather than requested.
+| Field | base | tuned | `deepseek-v3.2` |
+| --- | --- | --- | --- |
+| doc_type | 0.92 | 1.00 | 1.00 |
+| amount | 1.00 | 1.00 | 1.00 |
+| fee | 0.77 | 1.00 | 1.00 |
+| **date** | **0.10** | **0.97** | 0.98 |
+| time | 0.97 | 1.00 | 1.00 |
+| sender_name | 0.74 | 0.99 | 0.99 |
+| sender_account | 0.70 | 0.98 | 0.99 |
+| receiver_name | 0.60 | 1.00 | 0.99 |
+| receiver_account | 0.60 | 1.00 | 0.99 |
+| channel | 0.71 | 1.00 | 0.99 |
+| reference | 0.96 | 1.00 | 1.00 |
 
-**Naming conventions were worth 38 points of exact-record.** Scored by exact
-string, the same predictions give 0.957 field accuracy and **0.58** exact
-records; the model answered "SCB" where the corpus says ธนาคารไทยพาณิชย์,
-"TrueMoney" for "TrueMoney Wallet", "ttb touch" for the bank's full Thai name.
-None of those is a reading error. `channel` is now scored through an alias
-table ([`metrics.py`](src/slipft/metrics.py)), which lifts it from 0.59 to 0.99
-and the record rate to 0.96. Left as-is it would have flattered the fine-tuned
-model most of all: a model trained on 1,200 of these labels learns the house
-style in the first fifty examples, and the gap would have been the labels, not
-the extraction.
+**`date` at 0.10 is the whole story of the base model.** It reads the digits
+correctly and then writes `2569-01-07`, or subtracts 543 from a slip that was
+already Gregorian. The instruction to convert is right there in the prompt and
+it does not follow it. After training: 0.97. That is the one field in this task
+that is arithmetic rather than copying, and it is the one fine-tuning bought
+outright.
+
+**Format is trained, not requested.** Every base reply arrives wrapped in a
+```json fence; so do three quarters of the frontier model's. The tuned model
+emits a bare object 250 times out of 250. The prompt says "no markdown fence"
+in all three cases — only the trained model actually obeys it, which is the
+difference between a service that needs a fence-stripper forever and one that
+does not.
+
+## What the held-out layouts caught
+
+Two slip layouts — `ttb touch` transfers and Grab receipts — were generated for
+the test split only. Splitting the numbers by that boundary is where the honest
+reading of "0.96" lives:
+
+| | Seen layouts (175) | Unseen layouts (75) |
+| --- | --- | --- |
+| tuned, field accuracy | **1.000** | 0.982 |
+| tuned, exact record | **1.000** | 0.853 |
+| `deepseek-v3.2`, exact record | 0.960 | 0.947 |
+
+On layouts it trained on, the adapter is **perfect — 175 of 175 slips, all
+eleven fields**. On layouts it has never seen it drops to 0.853, while the
+frontier model barely moves (0.960 → 0.947). Reported as a single number, the
+fine-tune looks equal to the frontier model. Split by layout, it is better on
+the familiar and worse on the unfamiliar, and that is the trade a fine-tune
+actually makes.
+
+**All 15 of the tuned model's remaining field errors are on one layout**, and
+they have a shape:
+
+```
+อานนท์ ทองคำ | XXX-XXX5559 |
+โอนไปยัง
+อรทัย เกษมสุข | 651-1-6409-6
+26,453.80                        <- the amount, alone on its line
+17 ก.ย. 68 · 00:51               <- the date, unlabelled, directly below
+
+truth  date = 2025-09-17
+tuned  date = 2025-09-26         <- day borrowed from the line above
+```
+
+The Buddhist year is still converted correctly — `68` → 2025. What is lost is
+*where the day lives*: in the eight training layouts the date follows a label
+like `วันที่`, and here it does not, so the model reaches to the neighbouring
+line. The account errors are the same failure in a different costume:
+`368-4-9853-5` came back as `**4-9853-5`, the masking style of the *other*
+account on the slip, which the model has learned is a thing accounts look like.
+
+That is what over-specialisation looks like from the inside, and a benchmark
+without held-out layouts would have printed 1.000 and said nothing about it.
+
+## What it does not buy
+
+**Speed, as measured here.** The tuned model's median latency is 6,571 ms
+against 4,449 ms for an API call over the internet. Unbatched `model.generate`
+on a T4 is a slow way to serve a 1.5B model — vLLM or llama.cpp on the same
+weights would change this number completely, and the honest statement is that
+this benchmark measured accuracy, not a serving stack.
+
+What it does buy is everything the latency column is not: the slips never leave
+the machine, the marginal cost per document is zero, the output format is
+reliable enough to skip a parser, and the whole artifact is a **67 MB adapter**
+over a 1 GB base — small enough to ship inside an app.
 
 ## Quick start
 
@@ -129,14 +195,19 @@ uv run python -m slipft.api_baseline --model deepseek-v3.2
 uv run python -m slipft.score results/*.predictions.jsonl
 ```
 
-Then the training run:
+Reproducing the training run:
 
 1. open [`notebooks/qlora_colab.ipynb`](notebooks/qlora_colab.ipynb) in Colab,
    **Runtime → Change runtime type → T4 GPU**
-2. run it top to bottom — ~15 min of training, ~20 min for the two evaluation
-   passes over 250 slips
+2. run it top to bottom — 18 min of training plus ~20 min for the two
+   evaluation passes over 250 slips
 3. drop `base.predictions.jsonl`, `tuned.predictions.jsonl` and `train_log.json`
    into `results/`, and score them with the same command as above
+
+The run that produced the numbers above: 1,200 rows, 2 epochs, effective batch
+8, lr 2e-4, LoRA `r=16` on all seven projections, loss on the answer only.
+Final training loss 0.007, validation loss 0.0001 — a fit that tight is a
+warning as much as a result, and the unseen-layout column is where it shows.
 
 The notebook produces predictions only. Scoring stays here so that the local
 models and the API models are graded by the same code — a benchmark where each
@@ -164,9 +235,10 @@ that look like these". Three things keep that from being a free pass:
 
 ## Known limits
 
-- **The headline rows are not filled in yet.** Base and tuned come from the
-  Colab run, and this README will carry whatever they turn out to be, including
-  a fine-tune that fails to reach the API baseline.
+- **The tuned model is over-fitted to the layouts it saw** — 1.000 exact record
+  on those, 0.853 on two it did not. Validation loss of 0.0001 says the same
+  thing from the other end. More layouts, or aggressive augmentation of the
+  ones there are, is the fix; a single headline number would have hidden it.
 - **Generated data, self-authored schema.** See above. An evaluation on 50
   photographed real slips would be worth more than all 250 of these, and is the
   obvious next step.
@@ -180,4 +252,9 @@ that look like these". Three things keep that from being a free pass:
   the wrong place, not a model that cannot read Thai. The default is now 1,200.
 - **Latency across rows is not apples to apples.** The API row includes the
   network and someone else's queue; base and tuned are measured on the same T4
-  in the same session and are comparable to each other only.
+  in the same session and are comparable to each other only. None of the three
+  is a serving benchmark — unbatched `model.generate` is the slowest reasonable
+  way to run these weights.
+- **The model reads text, not images.** A real pipeline needs OCR or a vision
+  model in front of it, and its errors land here as garbled input. Nothing in
+  this repo measures that half.
